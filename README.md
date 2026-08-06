@@ -1,6 +1,6 @@
 # Mathmetics-Of-God
 
-Visualise every the concepts of Mathematics as if you are the creator of this Universe.
+Visualise the every concepts of Mathematics as if you are the creator of this Universe.
 
 A collection of Python scripts that visualize fundamental mathematical functions using plots — exploring how simple equations shape the patterns we see in nature.
 
