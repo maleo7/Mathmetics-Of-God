@@ -1,6 +1,6 @@
 # Mathmetics-Of-God
 
-Perhaps this is how supreme nature created the Mathematics in the Universe.
+Visualise every the concepts of Mathematics as if you are the creator of this Universe.
 
 A collection of Python scripts that visualize fundamental mathematical functions using plots — exploring how simple equations shape the patterns we see in nature.
 
