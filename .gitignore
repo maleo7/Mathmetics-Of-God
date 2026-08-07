@@ -1,2 +1,5 @@
 __pycache__/
 *.pyc
+
+# figures written by conic_sections_visualizer.py --save
+conic_*.png
