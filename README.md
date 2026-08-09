@@ -12,6 +12,7 @@ A collection of Python scripts that visualize fundamental mathematical functions
 | `quadratic_equation_plotter.py` | Plots quadratic equations (parabolic curves) |
 | `exponential_equation_plotter.py` | Plots exponential growth/decay curves |
 | `unit_circle_trigonometry.py` | Visualizes the unit circle and trigonometric relationships |
+| `conic_sections_visualizer.py` | Plots conic sections (circles, ellipses, parabolas, hyperbolas) |
 | `conic_sections_visualizer.py` | Slices a double cone with a plane to build a circle, ellipse, parabola or hyperbola — shown as a 3D construction next to the 2D curve |
 
 ## Getting Started
