@@ -14,16 +14,17 @@ A collection of Python scripts that visualize fundamental mathematical functions
 | `unit_circle_trigonometry.py` | Visualizes the unit circle and trigonometric relationships |
 | `conic_sections_equation_plotter.py` | Plots equations of conic sections (circles, ellipses, parabolas, hyperbolas) |
 | `conic_sections_visualizer.py` | Slices a double cone with a plane to build a circle, ellipse, parabola or hyperbola — shown as a 3D construction next to the 2D curve |
+| `derivative_limit_visualiser.py` | Builds the derivative from its limit definition — drag h → 0 and watch a secant line collapse onto the tangent |
 
 ## Getting Started
 
 ### Prerequisites
 
 - Python 3.x
-- Required libraries (e.g. `matplotlib`, `numpy`) — install with:
+- Required libraries (`matplotlib`, `numpy`, `sympy`) — install with:
 
 ```bash
-pip install matplotlib numpy
+pip install matplotlib numpy sympy
 ```
 
 ### Running the Scripts
