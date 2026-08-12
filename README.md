@@ -15,6 +15,7 @@ A collection of Python scripts that visualize fundamental mathematical functions
 | `conic_sections_equation_plotter.py` | Plots equations of conic sections (circles, ellipses, parabolas, hyperbolas) |
 | `conic_sections_visualizer.py` | Slices a double cone with a plane to build a circle, ellipse, parabola or hyperbola — shown as a 3D construction next to the 2D curve |
 | `derivative_limit_visualiser.py` | Builds the derivative from its limit definition — drag h → 0 and watch a secant line collapse onto the tangent |
+| `derivative_curve_tracer.py` | Animates the derivative *function* — a dot walks along f(x) carrying its tangent, and the panel below draws f'(x) stroke by stroke from the slope it reports; pause and drag the x slider (or arrow-key step) to park on any point and read its slope, angle and condition |
 
 ## Getting Started
 
