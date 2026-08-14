@@ -19,9 +19,7 @@ Only single-variable real functions of x.  First derivative only.
 from __future__ import annotations
 
 import argparse
-import math
 import re
-import sys
 import textwrap
 from dataclasses import dataclass, field
 from typing import Optional
@@ -43,21 +41,34 @@ RULE_COLORS = {
     "Difference Rule":         "#2e7d32",
     "Constant Multiple Rule":  "#558b2f",
     "Power Rule":              "#1565c0",
+    "Square Root":             "#0d47a1",
+    "Root":                    "#0d47a1",
     "Product Rule":            "#e65100",
     "Quotient Rule":           "#00796b",
     "Chain Rule":              "#7b1fa2",
     "Logarithmic Differentiation": "#c62828",
+    "Exponential Rule":        "#00695c",
     "Table Lookup":            "#616161",
     "Simplify":                "#37474f",
     "Fallback":                "#455a64",
 }
 
 def _rule_color(name: str) -> str:
-    """Return the hex colour for a rule, with a sensible default."""
+    """Return the hex colour for a rule, with a sensible default.
+
+    Prefers an exact rule-name match, then the most specific (longest)
+    palette key contained in the name.  Without this, "Constant Multiple
+    Rule" and "Exponential Rule (constant base)" would wrongly match the
+    short "Constant" key and render grey.
+    """
+    if name in RULE_COLORS:
+        return RULE_COLORS[name]
+
+    match = None  # (key, color) of the longest matching palette key
     for key, color in RULE_COLORS.items():
-        if key in name:
-            return color
-    return "#455a64"
+        if key in name and (match is None or len(key) > len(match[0])):
+            match = (key, color)
+    return match[1] if match else "#455a64"
 
 
 # ==========================================================================
@@ -562,7 +573,7 @@ def _is_product_rule(expr: sp.Expr) -> Optional[DiffStep]:
 
     # Split into u (first factor) and v (product of the rest).
     u = x_factors[0]
-    v = sp.Mul(*x_factors[1:]) if len(x_factors) > 1 else x_factors[1]
+    v = sp.Mul(*x_factors[1:])
     c = sp.Mul(*const_factors) if const_factors else sp.Integer(1)
 
     u_step = differentiate_step(u)
@@ -593,8 +604,7 @@ def _is_product_rule(expr: sp.Expr) -> Optional[DiffStep]:
 
 def _is_abs(expr: sp.Expr) -> Optional[DiffStep]:
     """d/dx[|u|] = sign(u) · u', with a note about x = 0."""
-    if not (isinstance(expr, sp.Abs) or
-            (hasattr(expr, 'func') and expr.func == sp.Abs)):
+    if not isinstance(expr, sp.Abs):
         return None
 
     u = expr.args[0]
@@ -684,8 +694,10 @@ def _is_chain_rule(expr: sp.Expr) -> Optional[DiffStep]:
             children=[inner_step],
         )
     else:
-        # Inner doesn't depend on x → whole thing is constant.
-        return _is_constant(expr)
+        # Inner is a constant — such a case is already caught by the
+        # _is_constant detector (first in the rule chain), so this is
+        # unreachable in practice.  Kept as a defensive fallback.
+        return None
 
 
 # ==========================================================================
@@ -739,8 +751,22 @@ def solve_derivative(func_text: str) -> tuple[sp.Expr, sp.Expr, list[DiffStep], 
     """
     f = parse_function(func_text)
 
-    # Step-by-step differentiation.
-    root_step = differentiate_step(f)
+    # Step-by-step differentiation (with a guard against deeply nested
+    # expressions that would blow the Python recursion limit).
+    try:
+        root_step = differentiate_step(f)
+    except RecursionError:
+        root_step = DiffStep(
+            sub_expr=f,
+            rule_name="Fallback (sympy.diff)",
+            rule_formula="(expression too deep — computed directly)",
+            result=sp.diff(f, X),
+            explanation=(
+                "The expression was too deeply nested to step through rule by rule, "
+                "so it was differentiated directly with sympy."
+            ),
+            color=_rule_color("Fallback"),
+        )
     steps = _flatten_steps(root_step)
 
     raw_derivative = root_step.result
@@ -751,21 +777,32 @@ def solve_derivative(func_text: str) -> tuple[sp.Expr, sp.Expr, list[DiffStep], 
     except Exception:
         simplified = raw_derivative
 
-    # Cross-check against sympy.diff.
+    # Cross-check against sympy.diff.  Equivalent forms may not collapse to a
+    # single zero with simplify() alone, so try several harder simplifications
+    # before warning (avoids benign false positives).
     warning = None
     try:
         sympy_answer = sp.diff(f, X)
-        diff = sp.simplify(simplified - sympy_answer)
-        if diff != 0:
-            # Try harder.
-            diff2 = sp.simplify(sp.trigsimp(simplified - sympy_answer))
-            if diff2 != 0:
-                warning = (
-                    f"⚠ Cross-check warning: our result and sympy.diff() disagree.\n"
-                    f"  Our result:   {_pretty(simplified)}\n"
-                    f"  sympy.diff(): {_pretty(sympy_answer)}\n"
-                    f"  These may be equivalent forms that simplify() could not unify."
-                )
+        checks = [
+            lambda: sp.simplify(simplified - sympy_answer),
+            lambda: sp.simplify(sp.trigsimp(simplified - sympy_answer)),
+            lambda: sp.simplify(sp.nsimplify(simplified - sympy_answer)),
+        ]
+        ok = False
+        for check in checks:
+            try:
+                if check() == 0:
+                    ok = True
+                    break
+            except Exception:
+                continue
+        if not ok:
+            warning = (
+                f"⚠ Cross-check warning: our result and sympy.diff() disagree.\n"
+                f"  Our result:   {_pretty(simplified)}\n"
+                f"  sympy.diff(): {_pretty(sympy_answer)}\n"
+                f"  These may be equivalent forms that simplify() could not unify."
+            )
     except Exception:
         pass
 
@@ -852,11 +889,11 @@ def print_steps(
 # ==========================================================================
 
 def _render_visualization(
-    func_text: str,
     f: sp.Expr,
     raw_derivative: sp.Expr,
     steps: list[DiffStep],
     simplified: sp.Expr,
+    out_prefix: str = "derivative_steps",
 ) -> None:
     """Render the worked solution as a colour-coded document using matplotlib."""
     import matplotlib.pyplot as plt
@@ -1010,7 +1047,7 @@ def _render_visualization(
         all_figs.append(fig)
 
     # --- Save as PDF (multi-page) ---
-    pdf_path = "derivative_steps.pdf"
+    pdf_path = f"{out_prefix}.pdf"
     try:
         with PdfPages(pdf_path) as pdf:
             for fig in all_figs:
@@ -1020,7 +1057,7 @@ def _render_visualization(
         print(f"  ✗ Could not save PDF: {exc}")
 
     # --- Save as PNG (stacked into one tall image) ---
-    png_path = "derivative_steps.png"
+    png_path = f"{out_prefix}.png"
     try:
         if len(all_figs) == 1:
             all_figs[0].savefig(png_path, dpi=150, bbox_inches="tight",
@@ -1067,7 +1104,8 @@ def _render_visualization(
 # SECTION 7 — CLI and REPL
 # ==========================================================================
 
-def _process_one(func_text: str, visualize: bool = True) -> bool:
+def _process_one(func_text: str, visualize: bool = True,
+                 out_prefix: str = "derivative_steps") -> bool:
     """Differentiate one function.  Returns True on success."""
     try:
         f, raw_derivative, steps, simplified, warning = solve_derivative(func_text)
@@ -1080,12 +1118,12 @@ def _process_one(func_text: str, visualize: bool = True) -> bool:
     if visualize:
         print("  Generating visualization...")
         try:
-            _render_visualization(func_text, f, raw_derivative, steps, simplified)
+            _render_visualization(f, raw_derivative, steps, simplified, out_prefix)
         except Exception as exc:
             print(f"  ✗ Visualization failed: {exc}")
         print()
     else:
-        print("  (visualization skipped — use without --no-visualize to see it)")
+        print("  (visualization skipped)")
         print()
 
     return True
@@ -1108,13 +1146,16 @@ def main() -> None:
                         help="Function f(x) to differentiate (e.g. 'x**3 * sin(x)').")
     parser.add_argument("--no-visualize", action="store_true",
                         help="Skip the visual document — console output only.")
+    parser.add_argument("--out-prefix", type=str, default="derivative_steps",
+                        help="Base name for the PDF/PNG output files "
+                             "(default: 'derivative_steps').")
 
     args = parser.parse_args()
     visualize = not args.no_visualize
 
     # --- One-shot mode ---
     if args.func:
-        _process_one(args.func, visualize)
+        _process_one(args.func, visualize, args.out_prefix)
         return
 
     # --- REPL mode ---
@@ -1154,7 +1195,7 @@ def main() -> None:
             do_viz = False
             user_input = user_input.replace("--no-viz", "").strip()
 
-        _process_one(user_input, do_viz)
+        _process_one(user_input, do_viz, args.out_prefix)
 
 
 if __name__ == "__main__":
